@@ -1,0 +1,14 @@
+{
+  "name": "unrar.js",
+  "version": "0.1.0",
+  "description": "Pure javascript unrar library. salvaged from bitjs.",
+  "main": "unrar.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "author": "Thomas Lanteigne",
+  "license": "MIT"
+}
