@@ -1,4 +1,4 @@
-# untar.js
+# unrar.js
 
 This is a pure-javascript implementation of unrar.
 The code has been ported from Jeff Schiller's bitjs, Thanks :).
