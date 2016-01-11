@@ -144,7 +144,7 @@ module.exports = {
             throw ("Unrar::Error, missing callback argument.");
         }
 
-        childProcess = child_process.fork("js/UnrarSubprocess.js", [l_sFile, l_sOutputDir]);
+        childProcess = child_process.fork(path.join(__dirname, "js/UnrarSubprocess.js"), [l_sFile, l_sOutputDir]);
 
         childProcess.on('message', (m) => {
             console.log("PARENT::Message Received");
