@@ -41,5 +41,6 @@ the asynchronous method needs to write to disk because it runs in a child proces
 
 ## Changelog
 
+* 0.2.1 — fixed bad path for forked Unrar sub process (in previous check-in)
 * 0.2.0 — added sync and async (forked process) execution of unrar
 * 0.1.0 — Initial Release
