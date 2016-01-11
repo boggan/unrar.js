@@ -1,144 +1,176 @@
-/**
- * unrar.js
- *
- * Copyright(c) 2011 Google Inc.
- * Copyright(c) 2011 antimatter15
- * Copyright(c) 2016 Thomas Lanteigne -- code porting
- *
- * Reference Documentation:
- *
- * http://kthoom.googlecode.com/hg/docs/unrar.html
- */
+var fs = require("fs"),
+    path = require("path"),
+    RarEventMgr = require("./lib/RarEventMgr"),
+    child_process = require("child_process");
 
-var BitStream = require("./lib/BitStream"),
-    RarVolumeHeader = require("./lib/RarVolumeHeader"),
-    RarLocalFile = require("./lib/RarLocalFile"),
-    RarUtils = require("./lib/RarUtils");
-
-// Helper functions.
-// var console.info = function(str) {
-//     postMessage(new bitjs.archive.UnarchiveInfoEvent(str));
-// };
-// var err = function(str) {
-//     postMessage(new bitjs.archive.UnarchiveErrorEvent(str));
-// };
-// var postProgress = function() {
-//     postMessage(new bitjs.archive.UnarchiveProgressEvent(
-//         RarUtils.PROGRESS.currentFilename,
-//         RarUtils.PROGRESS.currentFileNumber,
-//         RarUtils.PROGRESS.currentBytesUnarchivedInFile,
-//         RarUtils.PROGRESS.currentBytesUnarchived,
-//         RarUtils.PROGRESS.totalUncompressedBytesInArchive,
-//         RarUtils.PROGRESS.totalFilesInArchive));
-// };
-
-
-
-RarUtils.reset(); // make sure we flush all tracking variables
-
-function unrar(arrayBuffer) {
-    RarUtils.PROGRESS.currentFilename = "";
-    RarUtils.PROGRESS.currentFileNumber = 0;
-    RarUtils.PROGRESS.currentBytesUnarchivedInFile = 0;
-    RarUtils.PROGRESS.currentBytesUnarchived = 0;
-    RarUtils.PROGRESS.totalUncompressedBytesInArchive = 0;
-    RarUtils.PROGRESS.totalFilesInArchive = 0;
-
-    // postMessage(new bitjs.archive.UnarchiveStartEvent());
-
-    var bstream = new BitStream(arrayBuffer, false /* rtl */ );
-
-    var header = new RarVolumeHeader(bstream);
-    if (header.crc == 0x6152 &&
-        header.headType == 0x72 &&
-        header.flags.value == 0x1A21 &&
-        header.headSize == 7) {
-        console.info("Found RAR signature");
-
-        var mhead = new RarVolumeHeader(bstream);
-        if (mhead.headType != RarUtils.VOLUME_TYPES.MAIN_HEAD) {
-            console.info("Error! RAR did not include a MAIN_HEAD header");
-        } else {
-            var localFiles = [],
-                localFile = null;
-            do {
-                try {
-                    localFile = new RarLocalFile(bstream);
-                    console.info("RAR localFile isValid=" + localFile.isValid + ", volume packSize=" + localFile.header.packSize);
-                    if (localFile && localFile.isValid && localFile.header.packSize > 0) {
-                        RarUtils.PROGRESS.totalUncompressedBytesInArchive += localFile.header.unpackedSize;
-                        localFiles.push(localFile);
-                    } else if (localFile.header.packSize == 0 && localFile.header.unpackedSize == 0) {
-                        localFile.isValid = true;
-                    }
-                } catch (err) {
-                    break;
-                }
-                //console.info("bstream" + bstream.bytePtr+"/"+bstream.bytes.length);
-            } while (localFile.isValid);
-
-            RarUtils.PROGRESS.totalFilesInArchive = localFiles.length;
-
-            // now we have all console.information but things are unpacked
-            // TODO: unpack
-            localFiles = localFiles.sort(function(a, b) {
-                var aname = a.filename;
-                var bname = b.filename;
-                return aname > bname ? 1 : -1;
-
-                // extract the number at the end of both filenames
-                /*
-			  var aindex = aname.length, bindex = bname.length;
-
-			  // Find the last number character from the back of the filename.
-			  while (aname[aindex-1] < '0' || aname[aindex-1] > '9') --aindex;
-			  while (bname[bindex-1] < '0' || bname[bindex-1] > '9') --bindex;
-
-			  // Find the first number character from the back of the filename
-			  while (aname[aindex-1] >= '0' && aname[aindex-1] <= '9') --aindex;
-			  while (bname[bindex-1] >= '0' && bname[bindex-1] <= '9') --bindex;
-
-			  // parse them into numbers and return comparison
-			  var anum = parseInt(aname.substr(aindex), 10),
-				  bnum = parseInt(bname.substr(bindex), 10);
-			  return bnum - anum;*/
-            });
-
-            console.info(localFiles.map(function(a) {
-                return a.filename
-            }).join(', '));
-
-            for (var i = 0; i < localFiles.length; ++i) {
-                var localfile = localFiles[i];
-
-                console.log("Local file: ", localfile.filename);
-                // update progress
-                RarUtils.PROGRESS.currentFilename = localfile.header.filename;
-                RarUtils.PROGRESS.currentBytesUnarchivedInFile = 0;
-
-                // actually do the unzipping
-                localfile.unrar();
-
-                // if (localfile.isValid) {
-                //     postMessage(new bitjs.archive.UnarchiveExtractEvent(localfile));
-                //     postProgress();
-                // }
-            }
-
-            // postProgress();
+function _registerEvents(i_oEvents) {
+    RarEventMgr.on(RarEventMgr.TYPES.START, function() {
+        if (i_oEvents.onStart) {
+            i_oEvents.onStart();
         }
-    } else {
-        console.error("Invalid RAR file");
+    });
+
+    RarEventMgr.on(RarEventMgr.TYPES.PROGRESS, function(i_oProgressData) {
+        if (i_oEvents.onProgress) {
+            i_oEvents.onProgress(i_oProgressData);
+        }
+    });
+
+    RarEventMgr.on(RarEventMgr.TYPES.EXTRACT, function(i_oFile) {
+        if (i_oEvents.onExtract) {
+            i_oEvents.onExtract(i_oFile);
+        }
+    });
+
+    RarEventMgr.on(RarEventMgr.TYPES.FINISH, function(i_aFiles) {
+        if (i_oEvents.onFinish) {
+            i_oEvents.onFinish(i_aFiles);
+        }
+    });
+
+    RarEventMgr.on(RarEventMgr.TYPES.INFO, function(i_sStr) {
+        if (i_oEvents.onInfo) {
+            i_oEvents.onInfo(i_sStr);
+        }
+    });
+
+    RarEventMgr.on(RarEventMgr.TYPES.ERROR, function(i_sStr) {
+        if (i_oEvents.onError) {
+            i_oEvents.onError(i_sStr);
+        }
+    });
+}
+
+//==============================================================================
+function storeFilesToDiskSync(i_aFiles, i_sOutputdir) {
+    var l_oStats = fs.statSync(i_sOutputdir),
+        l_aWrittenFiles;
+
+    if (!l_oStats.isDirectory()) {
+        fs.mkdirSync(i_sOutputdir);
     }
 
-    return localFiles;
-    // postMessage(new bitjs.archive.UnarchiveFinishEvent());
+    l_aWrittenFiles = i_aFiles.map(function(i_oFile) {
+        storeFileToDiskSync(i_oFile, i_sOutputdir);
+        return path.join(i_sOutputdir, i_oFile.filename);
+    });
+
+    return l_aWrittenFiles;
+}
+
+//==============================================================================
+function storeFileToDiskSync(i_oFile) {
+    var l_sDirname = path.dirname(i_oFile.filename),
+        l_sFilename,
+        l_oStats,
+        l_oBuffer;
+
+    console.log("File name: ", i_oFile.filename, " size: ", i_oFile.header.unpackedSize);
+    console.log("Saving content of file ");
+
+    l_sDirname = path.dirname(i_oFile.filename);
+    l_sFilename = path.join(__dirname, path.basename(i_oFile.filename));
+    l_oBuffer = new Buffer(i_oFile.fileData); // filedata is Uint8Array
+
+    fs.writeFileSync(l_sFilename, l_oBuffer);
+}
+
+module.exports = {
+    // file, [, outputdir [, options]]
+    // if no output dir -> returns list of files
+    // if outputdir -> returns list of filenames
+    //==============================================================================
+    unrarSync: function() {
+        var unrar = require("./lib/Unrar"),
+            l_sFile = arguments[0],
+            l_sOutputDir,
+            l_aUnrarredFiles,
+            l_oBuffer,
+            l_oOptions;
+
+        // check if output dir specified
+        if (typeof(arguments[1]) === "string") {
+            l_sOutputDir = arguments[1];
+            l_oOptions = arguments[2] || {};
+        } else {
+            l_oOptions = arguments[1] || {};
+        }
+
+        _registerEvents(l_oOptions);
+        l_oBuffer = fs.readFileSync(l_sFile);
+        l_aUnrarredFiles = unrar(l_oBuffer);
+
+        if (l_sOutputDir) {
+            l_aUnrarredFiles = storeFilesToDiskSync(l_aUnrarredFiles, l_sOutputDir);
+        }
+
+        return l_aUnrarredFiles;
+    },
+
+    // file, , outputdir[, options]], callback
+    // if no output dir -> returns list of files
+    // if outputdir -> returns list of filenames
+    //==============================================================================
+    unrar: function() {
+        var l_sFile = arguments[0],
+            l_sOutputDir = arguments[1],
+            l_oOptions,
+            l_oCallback,
+            l_aUnrarredFiles = [],
+            l_sError;
+
+        // 0 -> file
+        // 1 -> outputdir
+        // 2 -> options OR callback
+        // 3 -> Callback
+
+        if (typeof(arguments[2]) === "function") {
+            l_oOptions = {};
+            l_oCallback = arguments[2];
+        } else {
+            l_oOptions = arguments[2] || {};
+            l_oCallback = arguments[3];
+        }
+
+        if (!l_sFile || typeof(l_sFile) !== "string") {
+            throw ("Unrar::Error, missing file argument.");
+        }
+
+        if (!l_sOutputDir || typeof(l_sOutputDir) !== "string") {
+            throw ("Unrar::Error, missing output directory argument.");
+        }
+
+        if (!l_oCallback) {
+            throw ("Unrar::Error, missing callback argument.");
+        }
+
+        childProcess = child_process.fork("js/UnrarSubprocess.js", [l_sFile, l_sOutputDir]);
+
+        childProcess.on('message', (m) => {
+            console.log("PARENT::Message Received");
+            if (m.event === "progress") {
+                if (l_oOptions.onProgress) {
+                    l_oOptions.onProgress(m.data);
+                }
+            } else if (m.event === "finish") {
+                console.log("FINISH RECEIVED! ");
+                l_aUnrarredFiles = m.data;
+                // l_aUnrarredFiles.map((file) => {
+                //     file.fileData = convertToUInt8Array(file.fileData);
+                // });
+                childProcess.kill("SIGHUP");
+            } else if (m.event === "error") {
+                l_sError = m.data;
+                childProcess.kill("SIGKILL");
+            } else if (m.event === "abort") {
+                l_sError = m.data;
+                childProcess.kill("SIGKILL");
+            }
+
+        });
+
+        childProcess.on('close', function() {
+            l_oCallback(l_sError, l_aUnrarredFiles);
+        });
+    }
 };
-
-module.exports = unrar;
-
-// // event.data.file has the ArrayBuffer.
-// onmessage = function(event) {
-//     var ab = event.data.file;
-//     unrar(ab, true);
-// };
