@@ -1,14 +1,21 @@
 {
-  "name": "unrar.js",
-  "version": "0.2.1",
-  "description": "Pure javascript unrar library. salvaged from bitjs.",
-  "main": "unrar.js",
-  "directories": {
-    "test": "test"
-  },
-  "scripts": {
-    "test": "node test/test.js"
-  },
-  "author": "Thomas Lanteigne",
-  "license": "MIT"
+    "name": "unrar.js",
+    "version": "0.2.1",
+    "description": "Pure javascript unrar library. salvaged from bitjs.",
+    "main": "unrar.js",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/boggan/unrar.js.git"
+    },
+    "directories": {
+        "test": "test"
+    },
+    "scripts": {
+        "test": "node test/test.js"
+    },
+    "author": "Thomas Lanteigne",
+    "license": "MIT",
+    "dependencies": {
+        "mkdirp": "^0.5.1"
+    }
 }

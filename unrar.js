@@ -43,12 +43,9 @@ function _registerEvents(i_oEvents) {
 
 //==============================================================================
 function storeFilesToDiskSync(i_aFiles, i_sOutputdir) {
-    var l_oStats = fs.statSync(i_sOutputdir),
-        l_aWrittenFiles;
+    var l_aWrittenFiles;
 
-    if (!l_oStats.isDirectory()) {
-        fs.mkdirSync(i_sOutputdir);
-    }
+    mkdirp.sync(i_sOutputdir);
 
     l_aWrittenFiles = i_aFiles.map(function(i_oFile) {
         storeFileToDiskSync(i_oFile, i_sOutputdir);
@@ -147,17 +144,12 @@ module.exports = {
         childProcess = child_process.fork(path.join(__dirname, "js/UnrarSubprocess.js"), [l_sFile, l_sOutputDir]);
 
         childProcess.on('message', (m) => {
-            console.log("PARENT::Message Received");
             if (m.event === "progress") {
                 if (l_oOptions.onProgress) {
                     l_oOptions.onProgress(m.data);
                 }
             } else if (m.event === "finish") {
-                console.log("FINISH RECEIVED! ");
                 l_aUnrarredFiles = m.data;
-                // l_aUnrarredFiles.map((file) => {
-                //     file.fileData = convertToUInt8Array(file.fileData);
-                // });
                 childProcess.kill("SIGHUP");
             } else if (m.event === "error") {
                 l_sError = m.data;

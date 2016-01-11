@@ -1,5 +1,6 @@
 var fs = require("fs"),
     path = require("path"),
+    mkdirp = require("mkdirp"),
     unrar = require("../lib/unrar"),
     RarEventMgr = require("../lib/RarEventMgr");
 
@@ -38,16 +39,9 @@ function storeFileToDisk(i_oFile, i_sOutput) {
     l_sDirname = path.join(i_sOutput, path.dirname(i_oFile.filename));
     l_sFilename = path.join(l_sDirname, path.basename(i_oFile.filename));
     return new Promise(function(i_oResolve) {
-        // check if l_sOutput + l_sDirname exists
-        fs.stat(l_sDirname, function(err, i_oStats) {
-            console.log("GOT STATS: ", i_oStats);
-            if (err || !i_oStats.isDirectory()) {
-                fs.mkdir(l_sDirname, function() {
-                    _writeFile(l_sFilename, i_oFile, i_oResolve);
-                });
-            } else {
-                _writeFile(l_sFilename, i_oFile, i_oResolve);
-            }
+        mkdirp(l_sDirname, function (err) {
+            if (err) console.error(err);
+            _writeFile(l_sFilename, i_oFile, i_oResolve);
         });
     });
 }
