@@ -1,6 +1,6 @@
 {
     "name": "unrar.js",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "description": "Pure javascript unrar library. salvaged from bitjs.",
     "main": "unrar.js",
     "keywords": ["unrar", "unarchived", "archive", "bitjs"],
