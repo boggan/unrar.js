@@ -150,7 +150,7 @@ module.exports = {
                 }
             } else if (m.event === "finish") {
                 l_aUnrarredFiles = m.data;
-                childProcess.kill("SIGHUP");
+                childProcess.kill();
             } else if (m.event === "error") {
                 l_sError = m.data;
                 childProcess.kill("SIGKILL");
