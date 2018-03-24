@@ -40,7 +40,8 @@ asynchronous usage:
 the asynchronous method needs to write to disk because it runs in a child process, and transferring the binaries over a string channel is pretty damn slow. Maybe one day, I'll try using local sockets ;)
 
 ## Changelog
-
+* 0.2.5 — fixed bad require case for case sensitive filesystems in subprocess
+* 0.2.1 — fixed bad path for forked Unrar sub process (in previous check-in)
 * 0.2.1 — fixed bad path for forked Unrar sub process (in previous check-in)
 * 0.2.0 — added sync and async (forked process) execution of unrar
 * 0.1.0 — Initial Release
