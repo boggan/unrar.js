@@ -1,7 +1,7 @@
 var fs = require("fs"),
     path = require("path"),
     mkdirp = require("mkdirp"),
-    unrar = require("../lib/unrar"),
+    unrar = require("../lib/Unrar"),
     RarEventMgr = require("../lib/RarEventMgr");
 
 function _registerEvents() {
